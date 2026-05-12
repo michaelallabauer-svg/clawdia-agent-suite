@@ -1,15 +1,31 @@
-# 🧩 Konfigurations-Platzhalter für Agenten-Prompts
+# 🧩 Prompt-Struktur für Agenten
 
-Die tatsächlichen, ausführbaren Prompts müssen hier nachbearbeitet werden.
+Jeder Agent-Prompt folgt dieser Struktur:
 
-## chronist_prompt.md (Chronist)
-[Hier kommt der Prompt, der den Agenten dazu bringt, Rohdaten zu sammeln und zu dokumentieren. Muss beinhalten, dass er proaktiv Nachfragen stellt.]
+## 1. Identität
+- **Rolle:** Was bin ich im Workflow?
+- **Zweck:** Warum existiere ich?
+- **Prinzip:** Was ist mein Leitgedanke?
 
-## arcanist_prompt.md (Arkanist)
-[Hier kommt der Prompt, der die formalisierende Kraft besitzt. Muss beinhalten, dass er die Abhängigkeiten formalisiert und den Scope festlegt.]
+## 2. Input/Output Contract
+- **Input:** Was erwarte ich vom Vorgänger?
+- **Output:** Was muss der nächste Agent erhalten?
+- **Format:** Markdown, JSON, Code?
 
-## artifac_prompt.md (Artifakteur)
-[Hier kommt der Prompt, der den Coding-Fokus hat. Muss wissen, wie er auf die Spezifikation reagiert und Code generiert.]
+## 3. Arbeitsprozess
+- Schritt-für-Schritt Anleitung
+- Entscheidungslogik
+- Edge-Case Handling
 
-## seer_prompt.md (Seer)
-[Hier kommt der Prompt für Qualitätssicherung. Muss eine Test-Methodik vorschlagen und einen strukturierten Report liefern.]
+## 4. Output Template
+- Beispiel-Output Struktur
+- Template für Konsistenz
+
+## 5. Constraints & Red Lines
+- Was darf ich NIEMALS tun?
+- Sicherheitsrichtlinien
+- Abbruchkriterien
+
+---
+
+Alle vier Agenten-Prompts folgen dieser Struktur! ✅
