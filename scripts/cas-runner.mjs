@@ -76,6 +76,27 @@ function projectFileList() {
   return files;
 }
 
+function validateChronistOutput(text) {
+  if (isFallbackArtifact(artifacts.chronist)) {
+    throw new Error('Chronist did not write a real protocol; only fallback output exists.');
+  }
+  if (!/^# .+/m.test(text) || !/Übergabe|Uebergabe|Bekannte Fakten|Offene Punkte/i.test(text)) {
+    throw new Error('Chronist output is incomplete: expected heading and handoff/known-facts section.');
+  }
+}
+
+function validateArcanistOutput(text) {
+  if (isFallbackArtifact(artifacts.spec)) {
+    throw new Error('Arcanist did not write a real spec; only fallback output exists.');
+  }
+  const hasGoal = /(^|\n)#{1,3} .*?(Ziel|Goal)|(^|\n).*?(🎯|Ziel)\b/i.test(text);
+  const hasScope = /Scope|Included|Excluded|Funktional|Anforderung/i.test(text);
+  const hasTechnical = /API|Endpoint|Datenmodell|Architektur|Technolog|Implementierung|Stack/i.test(text);
+  if (text.trim().length < 800 || !hasGoal || !hasScope || !hasTechnical) {
+    throw new Error(`Arcanist output is incomplete: expected structured executable spec, got ${text.trim().length} chars.`);
+  }
+}
+
 function validateArtifacOutput() {
   const files = projectFileList();
   const hasEntrypoint = files.some(f => /(?:^|\/)src\/(?:index|server|app)\.(?:js|mjs|ts)$/.test(f));
@@ -88,27 +109,56 @@ function validateArtifacOutput() {
   }
 }
 
+function validateSeerOutput(auditText) {
+  if (isFallbackArtifact(artifacts.audit)) {
+    throw new Error('Seer did not write a real audit; only fallback output exists.');
+  }
+  if (!/^CAS_STATUS:\s*(PASS|FAIL)\s*$/im.test(auditText)) {
+    throw new Error('Seer output is incomplete: missing exact CAS_STATUS: PASS or CAS_STATUS: FAIL line.');
+  }
+}
+
 function validateSeerPass(auditText) {
-  if (isFallbackArtifact(artifacts.audit)) return false;
+  validateSeerOutput(auditText);
   return /^CAS_STATUS:\s*PASS\s*$/im.test(auditText);
 }
 
-function extractVisibleOutput(stdout) {
+function parseAgentResult(stdout) {
   const trimmed = stdout.trim();
-  if (!trimmed) return '';
+  const result = { parsed: null, visibleOutput: trimmed, failed: false, reason: null };
+  if (!trimmed) {
+    result.visibleOutput = '';
+    return result;
+  }
   try {
     const parsed = JSON.parse(trimmed);
+    result.parsed = parsed;
     const payloads = parsed?.result?.payloads;
     if (Array.isArray(payloads)) {
-      const text = payloads.map(p => p?.text || '').filter(Boolean).join('\n\n').trim();
-      if (text) return text;
+      result.visibleOutput = payloads.map(p => p?.text || '').filter(Boolean).join('\n\n').trim();
     }
     const metaText = parsed?.result?.meta?.finalAssistantVisibleText || parsed?.result?.meta?.finalAssistantRawText;
-    if (typeof metaText === 'string' && metaText.trim()) return metaText.trim();
+    if (!result.visibleOutput && typeof metaText === 'string') result.visibleOutput = metaText.trim();
+
+    const meta = parsed?.result?.meta || {};
+    const status = parsed?.status;
+    const stopReason = parsed?.stopReason || meta.stopReason || meta.finishReason;
+    if (status && status !== 'ok') {
+      result.failed = true;
+      result.reason = `agent status=${status}${stopReason ? ` stopReason=${stopReason}` : ''}`;
+    }
+    if (meta.aborted || meta.timedOut || meta.idleTimedOut || meta.externalAbort || meta.timedOutDuringCompaction || meta.timedOutDuringToolExecution) {
+      result.failed = true;
+      result.reason = meta.promptError || `agent aborted/timed out${stopReason ? ` stopReason=${stopReason}` : ''}`;
+    }
+    if (stopReason && /timeout|abort|error|rpc/i.test(String(stopReason))) {
+      result.failed = true;
+      result.reason = result.reason || `agent stopReason=${stopReason}`;
+    }
   } catch {
     // stdout may already be plain text.
   }
-  return trimmed;
+  return result;
 }
 
 function runAgent(agent, message, outPath) {
@@ -125,8 +175,15 @@ function runAgent(agent, message, outPath) {
     const detail = (res.stderr || res.stdout || `${agent} exited with status ${res.status}`).trim();
     throw new Error(`${agent} failed after ${elapsed}s: ${detail}`);
   }
+  const agentResult = parseAgentResult(res.stdout);
+  if (agentResult.failed) {
+    if (!existsSync(outPath) && agentResult.visibleOutput) {
+      writeFileSync(outPath, agentResult.visibleOutput.endsWith('\n') ? agentResult.visibleOutput : `${agentResult.visibleOutput}\n`);
+    }
+    throw new Error(`${agent} failed after ${elapsed}s: ${agentResult.reason || 'agent returned failed status'}`);
+  }
   if (!existsSync(outPath)) {
-    const visibleOutput = extractVisibleOutput(res.stdout);
+    const visibleOutput = agentResult.visibleOutput;
     if (visibleOutput) {
       writeFileSync(outPath, visibleOutput.endsWith('\n') ? visibleOutput : `${visibleOutput}\n`);
       log(`recovered ${agent} artifact from visible agent output`);
@@ -153,11 +210,13 @@ try {
 
   activeStep = 'chronist';
   saveState('running', activeStep);
-  runAgent('chronist', `Lies ${artifacts.input} und erstelle das Rohprotokoll.`, artifacts.chronist);
+  const chronistText = runAgent('chronist', `Lies ${artifacts.input} und erstelle das Rohprotokoll.`, artifacts.chronist);
+  validateChronistOutput(chronistText);
 
   activeStep = 'arcanist';
   saveState('running', activeStep);
-  runAgent('arcanist', `Lies ${artifacts.chronist} und erstelle eine ausführbare Spezifikation.`, artifacts.spec);
+  const specText = runAgent('arcanist', `Lies ${artifacts.chronist} und erstelle eine ausführbare Spezifikation.`, artifacts.spec);
+  validateArcanistOutput(specText);
 
   let audit = '';
   for (let i = 0; i <= maxIterations; i++) {
