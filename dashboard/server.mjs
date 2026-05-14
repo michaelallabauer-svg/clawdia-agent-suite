@@ -27,6 +27,7 @@ const ARTIFACTS = {
   chronist: '01_chronist.md',
   spec: '02_arcanist_spec.md',
   buildReport: '03_artifac_report.md',
+  implementationPlan: '02b_artifac_plan.md',
   audit: '04_seer_audit.md',
   state: 'state.json',
   stdout: 'runner.stdout.log',

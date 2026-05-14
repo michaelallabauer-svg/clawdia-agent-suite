@@ -41,7 +41,7 @@ async function renderDetail(runId) {
   $('sourceProjectDir').textContent = run.sourceProjectDir || '—';
   $('lastError').textContent = run.lastError || '—';
   const buttons = $('artifactButtons'); buttons.innerHTML = '';
-  for (const key of ['input','chronist','spec','buildReport','audit','projectManifest','state','stdout','stderr','start']) {
+  for (const key of ['input','chronist','spec','implementationPlan','buildReport','audit','projectManifest','state','stdout','stderr','start']) {
     const b = document.createElement('button');
     b.textContent = key;
     b.disabled = !run.files[key];

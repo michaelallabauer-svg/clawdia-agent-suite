@@ -42,6 +42,7 @@ const artifacts = {
   chronist: join(runDir, '01_chronist.md'),
   spec: join(runDir, '02_arcanist_spec.md'),
   buildReport: join(runDir, '03_artifac_report.md'),
+  implementationPlan: join(runDir, '02b_artifac_plan.md'),
   audit: join(runDir, '04_seer_audit.md')
 };
 
@@ -223,6 +224,73 @@ function truncateForPrompt(text, max = 120_000) {
   return text.length > max ? `${text.slice(0, max)}\n\n[... truncated ${text.length - max} chars ...]` : text;
 }
 
+function extractImplementationSteps(planText) {
+  const steps = planText
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => /^(?:[-*]|\d+[.)])\s+/.test(line))
+    .map(line => line.replace(/^(?:[-*]|\d+[.)])\s+/, '').trim())
+    .filter(Boolean)
+    .slice(0, 6);
+  return steps.length ? steps : ['Implementiere die Spezifikation in einem kleinen, reviewbaren Inkrement und führe passende Checks aus.'];
+}
+
+function runExistingProjectArtifac({ specText, fixContext = '' }) {
+  const planText = runAgent('artifac', `
+Erstelle zuerst nur einen Implementierungsplan für diesen Existing-Project-Run. Keine Dateien lesen oder schreiben, keine Tools verwenden.
+
+Ziel: Zerlege die Arbeit in maximal 6 kleine, testbare Schritte. Jeder Schritt soll höchstens 1-3 Dateien ändern und einen konkreten Check nennen.
+
+--- SPEZIFIKATION ---
+${truncateForPrompt(specText, 80_000)}
+--- END SPEZIFIKATION ---
+
+${fixContext}
+`, artifacts.implementationPlan, { textOnly: true });
+
+  const steps = extractImplementationSteps(planText);
+  const stepReports = [];
+  for (const [index, step] of steps.entries()) {
+    const stepNo = index + 1;
+    const stepReport = join(runDir, `03_artifac_step_${String(stepNo).padStart(2, '0')}.md`);
+    activeStep = `artifac-step-${stepNo}`;
+    saveState('running', activeStep, activeIteration);
+    const report = runAgent('artifac', `
+Dies ist ein Existing-Project-Run. Das Quellprojekt wurde als Arbeitskopie nach ${projectDir} kopiert.
+Verändere ausschließlich diese Arbeitskopie. Keine Dateien außerhalb PROJECT_DIR ändern.
+
+Arbeite nur an diesem kleinen Schritt (${stepNo}/${steps.length}):
+${step}
+
+Regeln:
+- Höchstens die für diesen Schritt notwendigen Dateien ändern.
+- Danach einen kleinen Check ausführen.
+- Schreibe einen knappen Schrittbericht nach ${stepReport}.
+
+Kontext: Spezifikation liegt in ${artifacts.spec}.
+${fixContext}
+`, stepReport);
+    stepReports.push({ stepNo, step, stepReport, report });
+  }
+
+  const summary = [
+    '# Artifac Build Report',
+    '',
+    '## Chunked Existing-Project Implementation',
+    `- Steps planned: ${steps.length}`,
+    '',
+    '## Steps',
+    ...stepReports.map(({ stepNo, step, stepReport }) => `- ${stepNo}. ${step}\n  - Report: ${stepReport}`),
+    '',
+    '## Notes',
+    '- Artifac was orchestrated in small steps to avoid long fragile tool-use runs.',
+    '- Seer audit determines final CAS_STATUS.',
+    ''
+  ].join('\n');
+  writeFileSync(artifacts.buildReport, summary);
+  return summary;
+}
+
 function runAgent(agent, message, outPath, options = {}) {
   log(`starting ${agent}; expected artifact: ${outPath}`);
   const textOnly = options.textOnly === true;
@@ -300,10 +368,11 @@ try {
     if (!existingProjectManifest && i === 0 && materializeStandardNodeApp({ specText, projectDir, buildReportPath: artifacts.buildReport })) {
       log('materialized standard Node.js test app without agent tool calls');
     } else {
-      const projectContext = existingProjectManifest
-        ? `Dies ist ein Existing-Project-Run. Das Quellprojekt wurde als Arbeitskopie nach ${projectDir} kopiert. Verändere ausschließlich diese Arbeitskopie. Erzeuge einen kleinen, reviewbaren Patch für die Spezifikation.`
-        : '';
-      runAgent('artifac', `Lies ${artifacts.spec}. Implementiere ausschließlich in ${projectDir}. ${projectContext} ${fixContext}`, artifacts.buildReport);
+      if (existingProjectManifest) {
+        runExistingProjectArtifac({ specText, fixContext });
+      } else {
+        runAgent('artifac', `Lies ${artifacts.spec}. Implementiere ausschließlich in ${projectDir}. ${fixContext}`, artifacts.buildReport);
+      }
     }
     if (!existingProjectManifest) validateArtifacOutput();
     else if (isFallbackArtifact(artifacts.buildReport)) throw new Error('Artifac did not write a real build report; only fallback output exists.');

@@ -14,6 +14,18 @@
 
 ---
 
+
+## Pflicht: Arbeit in kleine Schritte zerlegen
+
+Bevor du Dateien änderst, zerlege jede Aufgabe selbstständig in kleine, testbare Schritte.
+
+Regeln:
+- Maximal 1–3 Dateien pro Schritt ändern.
+- Nach jedem Schritt einen kleinen Check ausführen (`node --check`, `npm test`, gezielter Smoke-Test o.ä.).
+- Wenn die Aufgabe groß wirkt, erst einen kurzen Implementierungsplan schreiben und dann Schritt für Schritt abarbeiten.
+- Keine langen Tool-Use-Sessions mit vielen gleichzeitigen Änderungen. Kleine, abgeschlossene Inkremente sind Pflicht.
+- Bei bestehendem Projekt: Bestand respektieren, nur Arbeitskopie in `PROJECT_DIR` ändern, keine Greenfield-Neuerstellung.
+
 ## Arbeitsprozess
 
 1. **Setup:** Erstelle Verzeichnisstruktur basierend auf der Spezifikation.
