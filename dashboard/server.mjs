@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   createReadStream,
   existsSync,
@@ -217,6 +217,14 @@ const server = createServer(async (req, res) => {
       }
       walk(projectDir);
       return send(res, 200, { projectDir, files: files.sort((a, b) => a.path.localeCompare(b.path)) });
+    }
+    const openFinderMatch = url.pathname.match(/^\/api\/runs\/([^/]+)\/open-finder$/);
+    if (openFinderMatch && req.method === 'POST') {
+      const projectDir = join(safeRunDir(openFinderMatch[1]), 'project');
+      mkdirSync(projectDir, { recursive: true });
+      const result = spawnSync('open', [projectDir], { encoding: 'utf8' });
+      if (result.status !== 0) throw new Error(result.stderr || result.stdout || 'open failed');
+      return send(res, 200, { ok: true, projectDir });
     }
     const manualMatch = url.pathname.match(/^\/api\/runs\/([^/]+)\/manual-step$/);
     if (manualMatch && req.method === 'POST') {

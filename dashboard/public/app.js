@@ -78,5 +78,14 @@ $('loadProject').onclick = async () => {
   } catch (err) { $('projectFiles').textContent = err.message; }
 };
 
+$('openFinder').onclick = async () => {
+  if (!selectedRun) return;
+  try {
+    const data = await api(`/api/runs/${encodeURIComponent(selectedRun)}/open-finder`, { method:'POST' });
+    $('projectFiles').textContent = `Finder geöffnet:
+${data.projectDir}`;
+  } catch (err) { $('projectFiles').textContent = err.message; }
+};
+
 loadRuns();
 setInterval(loadRuns, 5000);
