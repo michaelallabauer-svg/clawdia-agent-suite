@@ -44,9 +44,9 @@ function promptPath(name) {
   return join(repo, '02_SPECS', `${name}_prompt.md`);
 }
 
-function runAgent(agent, model, message, outPath) {
+function runAgent(agent, message, outPath) {
   const fullMessage = `${readFileSync(promptPath(agent), 'utf8')}\n\n---\n\n# Orchestrator-Anweisung\n\nRUN_DIR: ${runDir}\nPROJECT_DIR: ${projectDir}\n\n${message}\n\nSchreibe dein finales Artefakt nach: ${outPath}\nArbeite ausschließlich in RUN_DIR/PROJECT_DIR. Keine Dateien in deinem Agenten-Workspace ablegen. Verwende absolute Pfade.`;
-  const res = spawnSync('openclaw', ['agent', '--agent', agent, '--model', model, '--message', fullMessage, '--timeout', '900', '--json'], {
+  const res = spawnSync('openclaw', ['agent', '--agent', agent, '--message', fullMessage, '--timeout', '900', '--json'], {
     cwd: runDir,
     encoding: 'utf8',
     maxBuffer: 50 * 1024 * 1024
@@ -68,19 +68,19 @@ if (dryRun) {
 }
 
 saveState('running', 'chronist');
-runAgent('chronist', 'ollama/qwen3.5:9b', `Lies ${artifacts.input} und erstelle das Rohprotokoll.`, artifacts.chronist);
+runAgent('chronist', `Lies ${artifacts.input} und erstelle das Rohprotokoll.`, artifacts.chronist);
 
 saveState('running', 'arcanist');
-runAgent('arcanist', 'ollama/qwen3.5:9b', `Lies ${artifacts.chronist} und erstelle eine ausführbare Spezifikation.`, artifacts.spec);
+runAgent('arcanist', `Lies ${artifacts.chronist} und erstelle eine ausführbare Spezifikation.`, artifacts.spec);
 
 let audit = '';
 for (let i = 0; i <= maxIterations; i++) {
   saveState('running', i === 0 ? 'artifac' : 'artifac-fix', i);
   const fixContext = i === 0 ? '' : `Zusätzlich liegt ein Seer-FAIL in ${artifacts.audit}. Behebe die dort genannten Fehler.`;
-  runAgent('artifac', 'ollama/qwen2.5-coder:14b', `Lies ${artifacts.spec}. Implementiere ausschließlich in ${projectDir}. ${fixContext}`, artifacts.buildReport);
+  runAgent('artifac', `Lies ${artifacts.spec}. Implementiere ausschließlich in ${projectDir}. ${fixContext}`, artifacts.buildReport);
 
   saveState('running', 'seer', i);
-  audit = runAgent('seer', 'ollama/qwen3.5:9b', `Lies ${artifacts.spec}, prüfe den Code in ${projectDir}, schreibe Audit mit eindeutiger Zeile CAS_STATUS: PASS oder CAS_STATUS: FAIL.`, artifacts.audit);
+  audit = runAgent('seer', `Lies ${artifacts.spec}, prüfe den Code in ${projectDir}, schreibe Audit mit eindeutiger Zeile CAS_STATUS: PASS oder CAS_STATUS: FAIL.`, artifacts.audit);
   if (/CAS_STATUS:\s*PASS/i.test(audit)) {
     saveState('passed', 'done', i);
     console.log(`CAS run passed: ${runDir}`);
