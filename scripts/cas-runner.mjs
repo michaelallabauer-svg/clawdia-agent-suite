@@ -89,11 +89,13 @@ function validateArcanistOutput(text) {
   if (isFallbackArtifact(artifacts.spec)) {
     throw new Error('Arcanist did not write a real spec; only fallback output exists.');
   }
-  const hasGoal = /(^|\n)#{1,3} .*?(Ziel|Goal)|(^|\n).*?(🎯|Ziel)\b/i.test(text);
-  const hasScope = /Scope|Included|Excluded|Funktional|Anforderung/i.test(text);
-  const hasTechnical = /API|Endpoint|Datenmodell|Architektur|Technolog|Implementierung|Stack/i.test(text);
-  if (text.trim().length < 800 || !hasGoal || !hasScope || !hasTechnical) {
-    throw new Error(`Arcanist output is incomplete: expected structured executable spec, got ${text.trim().length} chars.`);
+  const body = text.trim();
+  const hasGoal = /(^|\n)#{1,3} .*?(Ziel|Goal)|(^|\n).*?(🎯|Ziel)\b/i.test(body);
+  const hasScope = /Scope|Included|Excluded|Funktional|Anforderung/i.test(body);
+  const hasTechnical = /API|Endpoint|Datenmodell|Architektur|Technolog|Implementierung|Stack/i.test(body);
+  const refused = /NO_REPLY|nicht möglich|zu unklar|unseriös|Rücküberweisung|zurück an den Chronisten|keine brauchbare Spezifikation/i.test(body);
+  if (body.length < 800 || !hasGoal || !hasScope || !hasTechnical || refused) {
+    throw new Error(`Arcanist output is incomplete or refused: expected structured executable spec, got ${body.length} chars.`);
   }
 }
 
@@ -169,7 +171,7 @@ function runAgent(agent, message, outPath, options = {}) {
   log(`starting ${agent}; expected artifact: ${outPath}`);
   const textOnly = options.textOnly === true;
   const outputInstruction = textOnly
-    ? `Gib ausschließlich den finalen Inhalt für ${outPath} als Markdown/Text zurück. Verwende keine Tools, keine Tool-Calls, kein Lesen/Schreiben von Dateien. Der CAS-Runner speichert deine Antwort.`
+    ? `Gib ausschließlich den finalen Inhalt für ${outPath} als Markdown/Text zurück. Verwende keine Tools, keine Tool-Calls, kein Lesen/Schreiben von Dateien. Der CAS-Runner speichert deine Antwort. Antworte niemals mit NO_REPLY.`
     : `Schreibe dein finales Artefakt nach: ${outPath}`;
   const workspaceInstruction = textOnly
     ? `Arbeite nur mit dem unten eingebetteten Kontext. Keine Tool-Nutzung.`
