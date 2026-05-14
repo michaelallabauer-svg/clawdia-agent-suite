@@ -84,6 +84,20 @@ Dann öffnen:
 http://127.0.0.1:17888
 ```
 
+
+
+LAN-erreichbar starten, z.B. vom iPhone/anderen Rechner im Heimnetz:
+
+```bash
+CAS_DASHBOARD_HOST=0.0.0.0 CAS_DASHBOARD_PORT=17888 node dashboard/server.mjs
+```
+
+Dann im Browser öffnen:
+
+```text
+http://<mac-mini-ip>:17888
+```
+
 Funktionen:
 
 - Runs aus `runs/` anzeigen
