@@ -58,11 +58,17 @@ clawdia-agent-suite/
 │   ├── agent_labels.json
 │   └── process_guide.md
 ├── 04_RUNTIME/
+│   ├── auditors/
+│   │   └── node-express-crud.mjs
+│   ├── materializers/
+│   │   └── node-express-crud.mjs
 │   ├── orchestrator.md
 │   ├── project_contract.md
 │   └── run_state.schema.json
 ├── scripts/
-│   └── cas-runner.mjs
+│   ├── cas-runner.mjs
+│   ├── dashboard-start.mjs
+│   └── dashboard-stop.mjs
 └── runs/
     └── .gitkeep
 ```
@@ -75,7 +81,13 @@ Lokales Dashboard starten:
 
 ```bash
 cd /Users/michaelallabauer/.openclaw/workspace/Clawdia-agent-suit
-node dashboard/server.mjs --port=17888
+node scripts/dashboard-start.mjs
+```
+
+Stoppen:
+
+```bash
+node scripts/dashboard-stop.mjs
 ```
 
 Dann öffnen:
@@ -105,6 +117,9 @@ Funktionen:
 - Status/aktuellen Schritt beobachten
 - Artefakte lesen
 - Projektdateien listen
+- Ordner im Finder öffnen
+- `npm test` für einen Run ausführen
+- Runs aufräumen: Delete verschiebt Run-Ordner recoverable nach `runs/.trash/`
 - einzelne Agent-Schritte manuell starten: Chronist, Arcanist, Artifac, Seer
 
 ## Chat-/Telegram-Trigger
@@ -136,7 +151,14 @@ node scripts/cas-runner.mjs \
   --max-iterations 2
 ```
 
-Der Runner erzeugt einen Run-Ordner, ruft die Agenten sequenziell über `openclaw agent` auf und bricht erst ab, wenn der Seer `CAS_STATUS: PASS` meldet oder die maximale Iterationszahl erreicht ist.
+Der Runner erzeugt einen Run-Ordner und führt den Workflow sequenziell aus. Für den stabilen Default-Test-App-Flow nutzt CAS inzwischen deterministische Schritte:
+
+- Chronist: lokales Rohprotokoll
+- Arcanist: LLM-Spezifikation
+- Artifac: `04_RUNTIME/materializers/node-express-crud.mjs`
+- Seer: `04_RUNTIME/auditors/node-express-crud.mjs`
+
+So entstehen reproduzierbare Projektdateien und ein echtes `npm test`-Gate, statt fragile Tool-Use-Loops laufen zu lassen.
 
 ## Agenten und empfohlene Modelle
 

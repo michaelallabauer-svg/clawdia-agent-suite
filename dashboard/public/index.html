@@ -41,6 +41,7 @@
           </div>
           <dl class="meta">
             <dt>Step</dt><dd id="step"></dd>
+            <dt>Mode</dt><dd><span id="mode" class="modeBadge"></span></dd>
             <dt>Run Dir</dt><dd><code id="runDir"></code></dd>
             <dt>Project Dir</dt><dd><code id="projectDir"></code></dd>
             <dt>Error</dt><dd id="lastError"></dd>
@@ -67,6 +68,8 @@
           <div class="projectActions">
             <button id="loadProject">Projektliste laden</button>
             <button id="openFinder">Ordner im Finder öffnen</button>
+            <button id="runTests">Tests ausführen</button>
+            <button id="deleteRun" class="danger">Run löschen</button>
           </div>
           <pre id="projectFiles" class="result"></pre>
         </div>

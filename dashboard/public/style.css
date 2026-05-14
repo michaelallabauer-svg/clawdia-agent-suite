@@ -31,3 +31,9 @@ dt { color:var(--muted); } dd { margin:0; min-width:0; overflow-wrap:anywhere; }
 @media (max-width: 980px) { .create,.grid { grid-template-columns:1fr; } .manual { grid-template-columns:1fr; } }
 
 .projectActions { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+
+button.danger { background: var(--bad); }
+
+.modeBadge { display:inline-block; padding:4px 8px; border-radius:999px; background:#30363d; color:#c9d1d9; font-size:12px; font-weight:800; text-transform:uppercase; }
+.modeBadge.deterministic { background:#1f6feb; color:white; }
+.modeBadge.agentic { background:#8957e5; color:white; }

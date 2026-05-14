@@ -34,6 +34,8 @@ async function renderDetail(runId) {
   $('status').textContent = run.status;
   $('status').className = `badge ${badgeClass(run.status)}`;
   $('step').textContent = run.currentStep;
+  $('mode').textContent = run.mode || 'agentic';
+  $('mode').className = `modeBadge ${run.mode || 'agentic'}`;
   $('runDir').textContent = run.runDir;
   $('projectDir').textContent = run.projectDir;
   $('lastError').textContent = run.lastError || '—';
@@ -86,6 +88,38 @@ $('openFinder').onclick = async () => {
 ${data.projectDir}`;
   } catch (err) { $('projectFiles').textContent = err.message; }
 };
+
+$('runTests').onclick = async () => {
+  if (!selectedRun) return;
+  $('projectFiles').textContent = 'Tests laufen…';
+  try {
+    const data = await api(`/api/runs/${encodeURIComponent(selectedRun)}/test`, { method:'POST' });
+    $('projectFiles').textContent = `Test result: ${data.ok ? 'PASS' : 'FAIL'}
+Exit: ${data.status}
+Log: ${data.logPath}
+
+STDOUT:
+${data.stdout || '—'}
+
+STDERR:
+${data.stderr || '—'}`;
+  } catch (err) { $('projectFiles').textContent = err.message; }
+};
+
+$('deleteRun').onclick = async () => {
+  if (!selectedRun) return;
+  const runId = selectedRun;
+  if (!confirm(`Run wirklich löschen/archivieren?\n\n${runId}\n\nDer Ordner wird nach runs/.trash verschoben.`)) return;
+  try {
+    const data = await api(`/api/runs/${encodeURIComponent(runId)}`, { method:'DELETE' });
+    selectedRun = null;
+    $('detail').hidden = true;
+    $('detailEmpty').hidden = false;
+    $('startResult').textContent = `Run verschoben nach:\n${data.trashedTo}`;
+    await loadRuns();
+  } catch (err) { $('projectFiles').textContent = err.message; }
+};
+
 
 loadRuns();
 setInterval(loadRuns, 5000);

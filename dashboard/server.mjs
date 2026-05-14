@@ -8,10 +8,12 @@ import {
   readFileSync,
   statSync,
   writeFileSync,
-  openSync
+  openSync,
+  renameSync
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve, dirname, relative } from 'node:path';
+import { runProjectTests } from '../04_RUNTIME/auditors/node-express-crud.mjs';
 import { fileURLToPath } from 'node:url';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -80,6 +82,8 @@ function runSummary(runId) {
   const dir = safeRunDir(runId);
   const state = readJson(join(dir, 'state.json'), {});
   const start = readJson(join(dir, 'start.json'), {});
+  const buildReportPath = join(dir, ARTIFACTS.buildReport);
+  const mode = existsSync(buildReportPath) && readText(buildReportPath, 20_000).includes('Deterministic CAS materializer') ? 'deterministic' : 'agentic';
   const files = {};
   for (const [key, file] of Object.entries(ARTIFACTS)) {
     const path = join(dir, file);
@@ -95,6 +99,7 @@ function runSummary(runId) {
     projectDir: join(dir, 'project'),
     status: state.status || start.status || 'unknown',
     currentStep: state.currentStep || 'unknown',
+    mode,
     iterations: state.iterations ?? 0,
     lastError: state.lastError || null,
     startedAt: start.startedAt || null,
@@ -106,7 +111,7 @@ function runSummary(runId) {
 function listRuns() {
   mkdirSync(runsDir, { recursive: true });
   return readdirSync(runsDir, { withFileTypes: true })
-    .filter(d => d.isDirectory())
+    .filter(d => d.isDirectory() && !d.name.startsWith('.'))
     .map(d => runSummary(d.name))
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
@@ -154,6 +159,41 @@ function stepInfo(runId, agent) {
   return { dir, projectDir, artifact, message };
 }
 
+function deleteRun(runId) {
+  const dir = safeRunDir(runId);
+  const state = readJson(join(dir, 'state.json'), {});
+  if (state.status === 'running') throw new Error('cannot delete a running run');
+  const trashDir = join(runsDir, '.trash');
+  mkdirSync(trashDir, { recursive: true });
+  const target = join(trashDir, `${runId}-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+  renameSync(dir, target);
+  return { ok: true, runId, trashedTo: target };
+}
+
+function testRun(runId) {
+  const dir = safeRunDir(runId);
+  const projectDir = join(dir, 'project');
+  const result = runProjectTests(projectDir);
+  const logPath = join(dir, `dashboard-test-${Date.now()}.log`);
+  writeFileSync(logPath, [
+    `# Dashboard Test Run`,
+    `status: ${result.ok ? 'PASS' : 'FAIL'}`,
+    `exit: ${result.status}`,
+    '',
+    '## stdout',
+    '```',
+    result.stdout.trim(),
+    '```',
+    '',
+    '## stderr',
+    '```',
+    result.stderr.trim(),
+    '```',
+    ''
+  ].join('\n'));
+  return { ...result, logPath };
+}
+
 function startManualStep({ runId, agent, note = '' }) {
   if (!['chronist', 'arcanist', 'artifac', 'seer'].includes(agent)) throw new Error('unknown agent');
   const { dir, projectDir, artifact, message } = stepInfo(runId, agent);
@@ -193,6 +233,9 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/start' && req.method === 'POST') return send(res, 200, await startCas(await json(req)));
     const runMatch = url.pathname.match(/^\/api\/runs\/([^/]+)$/);
     if (runMatch && req.method === 'GET') return send(res, 200, runSummary(runMatch[1]));
+    if (runMatch && req.method === 'DELETE') return send(res, 200, deleteRun(runMatch[1]));
+    const testMatch = url.pathname.match(/^\/api\/runs\/([^/]+)\/test$/);
+    if (testMatch && req.method === 'POST') return send(res, 200, testRun(testMatch[1]));
     const artifactMatch = url.pathname.match(/^\/api\/runs\/([^/]+)\/artifact\/([^/]+)$/);
     if (artifactMatch && req.method === 'GET') {
       const dir = safeRunDir(artifactMatch[1]);
