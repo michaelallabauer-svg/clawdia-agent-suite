@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CAS Mission Control</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">Clawdia Agent Suite</p>
+      <h1>Mission Control</h1>
+    </div>
+    <button id="refresh">Aktualisieren</button>
+  </header>
+  <main>
+    <section class="panel create">
+      <h2>Neuen CAS-Run starten</h2>
+      <label>Titel/Slug <input id="title" placeholder="todo-auth-app" /></label>
+      <label>Auftrag <textarea id="input" rows="5" placeholder="Baue eine kleine To-Do App mit Login"></textarea></label>
+      <label>Max. Iterationen <input id="maxIterations" type="number" min="0" max="10" value="2" /></label>
+      <button id="start">Run starten</button>
+      <pre id="startResult" class="result"></pre>
+    </section>
+
+    <section class="grid">
+      <aside class="panel runs">
+        <h2>Runs</h2>
+        <div id="runs"></div>
+      </aside>
+      <section class="panel detail">
+        <div id="detailEmpty" class="empty">Run auswählen.</div>
+        <div id="detail" hidden>
+          <div class="detailHead">
+            <div>
+              <p class="eyebrow">Aktueller Run</p>
+              <h2 id="runId"></h2>
+            </div>
+            <span id="status" class="badge"></span>
+          </div>
+          <dl class="meta">
+            <dt>Step</dt><dd id="step"></dd>
+            <dt>Run Dir</dt><dd><code id="runDir"></code></dd>
+            <dt>Project Dir</dt><dd><code id="projectDir"></code></dd>
+            <dt>Error</dt><dd id="lastError"></dd>
+          </dl>
+
+          <h3>Manuell an Agent vergeben</h3>
+          <div class="manual">
+            <select id="manualAgent">
+              <option value="chronist">Chronist</option>
+              <option value="arcanist">Arcanist</option>
+              <option value="artifac">Artifac</option>
+              <option value="seer">Seer</option>
+            </select>
+            <input id="manualNote" placeholder="Optionale Zusatzanweisung" />
+            <button id="manualStart">Starten</button>
+          </div>
+          <pre id="manualResult" class="result"></pre>
+
+          <h3>Artefakte</h3>
+          <div id="artifactButtons" class="artifacts"></div>
+          <pre id="artifactText" class="artifactText"></pre>
+
+          <h3>Projektdateien</h3>
+          <button id="loadProject">Projektliste laden</button>
+          <pre id="projectFiles" class="result"></pre>
+        </div>
+      </section>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -68,6 +68,31 @@ clawdia-agent-suite/
 ```
 
 
+
+## CAS Mission Control Dashboard
+
+Lokales Dashboard starten:
+
+```bash
+cd /Users/michaelallabauer/.openclaw/workspace/Clawdia-agent-suit
+node dashboard/server.mjs --port=17888
+```
+
+Dann öffnen:
+
+```text
+http://127.0.0.1:17888
+```
+
+Funktionen:
+
+- Runs aus `runs/` anzeigen
+- neuen CAS-Run starten
+- Status/aktuellen Schritt beobachten
+- Artefakte lesen
+- Projektdateien listen
+- einzelne Agent-Schritte manuell starten: Chronist, Arcanist, Artifac, Seer
+
 ## Chat-/Telegram-Trigger
 
 CAS kann über den installierten Skill `cas-start` aus Chat/Telegram gestartet werden. Je nach Oberfläche geht das z.B. so:
