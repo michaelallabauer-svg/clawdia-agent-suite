@@ -162,7 +162,7 @@ function startManualStep({ runId, agent, note = '' }) {
   const fullMessage = `${readFileSync(promptPath, 'utf8')}\n\n---\n\n# Dashboard-Anweisung\n\nRUN_DIR: ${dir}\nPROJECT_DIR: ${projectDir}\n\n${message}\n${note ? `\nZusatznotiz: ${note}\n` : ''}\nSchreibe dein finales Artefakt nach: ${artifact}\nArbeite ausschließlich in RUN_DIR/PROJECT_DIR. Keine Dateien in deinem Agenten-Workspace ablegen. Verwende absolute Pfade.`;
   const logPath = join(dir, `manual-${agent}-${Date.now()}.log`);
   const fd = openSync(logPath, 'a');
-  const child = spawn('openclaw', ['agent', '--agent', agent, '--message', fullMessage, '--timeout', '900', '--json'], {
+  const child = spawn('openclaw', ['agent', '--agent', agent, '--session-id', `cas-${runId}-${agent}-${Date.now()}`, '--message', fullMessage, '--timeout', '900', '--json'], {
     cwd: dir,
     detached: true,
     stdio: ['ignore', fd, fd]

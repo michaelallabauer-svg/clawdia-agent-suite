@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -52,11 +52,52 @@ function promptPath(name) {
   return join(repo, '02_SPECS', `${name}_prompt.md`);
 }
 
+function sessionIdFor(agent) {
+  return `cas-${runId}-${agent}-${Date.now()}`.replace(/[^A-Za-z0-9._:-]/g, '-');
+}
+
+function isFallbackArtifact(path) {
+  if (!existsSync(path)) return true;
+  const head = readFileSync(path, 'utf8').slice(0, 160);
+  return /^# .* output fallback/m.test(head);
+}
+
+function projectFileList() {
+  const files = [];
+  function walk(dir) {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else files.push(path);
+    }
+  }
+  walk(projectDir);
+  return files;
+}
+
+function validateArtifacOutput() {
+  const files = projectFileList();
+  const hasEntrypoint = files.some(f => /(?:^|\/)src\/(?:index|server|app)\.(?:js|mjs|ts)$/.test(f));
+  const hasPackage = existsSync(join(projectDir, 'package.json'));
+  if (isFallbackArtifact(artifacts.buildReport)) {
+    throw new Error('Artifac did not write a real build report; only fallback output exists.');
+  }
+  if (!hasPackage || !hasEntrypoint) {
+    throw new Error(`Artifac output incomplete: expected package.json and src entrypoint in PROJECT_DIR, found ${files.length} file(s).`);
+  }
+}
+
+function validateSeerPass(auditText) {
+  if (isFallbackArtifact(artifacts.audit)) return false;
+  return /^CAS_STATUS:\s*PASS\s*$/im.test(auditText);
+}
+
 function runAgent(agent, message, outPath) {
   log(`starting ${agent}; expected artifact: ${outPath}`);
   const fullMessage = `${readFileSync(promptPath(agent), 'utf8')}\n\n---\n\n# Orchestrator-Anweisung\n\nRUN_DIR: ${runDir}\nPROJECT_DIR: ${projectDir}\n\n${message}\n\nSchreibe dein finales Artefakt nach: ${outPath}\nArbeite ausschließlich in RUN_DIR/PROJECT_DIR. Keine Dateien in deinem Agenten-Workspace ablegen. Verwende absolute Pfade.`;
   const started = Date.now();
-  const res = spawnSync('openclaw', ['agent', '--agent', agent, '--message', fullMessage, '--timeout', '900', '--json'], {
+  const res = spawnSync('openclaw', ['agent', '--agent', agent, '--session-id', sessionIdFor(agent), '--message', fullMessage, '--timeout', '900', '--json'], {
     cwd: runDir,
     encoding: 'utf8',
     maxBuffer: 50 * 1024 * 1024
@@ -67,8 +108,9 @@ function runAgent(agent, message, outPath) {
     throw new Error(`${agent} failed after ${elapsed}s: ${detail}`);
   }
   if (!existsSync(outPath)) {
-    // Fallback: preserve visible CLI output so the handoff is not lost.
+    // Preserve visible CLI output for diagnosis, but treat missing artifacts as failure.
     writeFileSync(outPath, `# ${agent} output fallback\n\n\`\`\`json\n${res.stdout.trim()}\n\`\`\`\n`);
+    throw new Error(`${agent} completed after ${elapsed}s but did not write expected artifact: ${outPath}`);
   }
   log(`finished ${agent} in ${elapsed}s`);
   return readFileSync(outPath, 'utf8');
@@ -100,11 +142,12 @@ try {
     saveState('running', activeStep, i);
     const fixContext = i === 0 ? '' : `Zusätzlich liegt ein Seer-FAIL in ${artifacts.audit}. Behebe die dort genannten Fehler.`;
     runAgent('artifac', `Lies ${artifacts.spec}. Implementiere ausschließlich in ${projectDir}. ${fixContext}`, artifacts.buildReport);
+    validateArtifacOutput();
 
     activeStep = 'seer';
     saveState('running', activeStep, i);
     audit = runAgent('seer', `Lies ${artifacts.spec}, prüfe den Code in ${projectDir}, schreibe Audit mit eindeutiger Zeile CAS_STATUS: PASS oder CAS_STATUS: FAIL.`, artifacts.audit);
-    if (/CAS_STATUS:\s*PASS/i.test(audit)) {
+    if (validateSeerPass(audit)) {
       saveState('passed', 'done', i);
       console.log(`CAS run passed: ${runDir}`);
       process.exit(0);
