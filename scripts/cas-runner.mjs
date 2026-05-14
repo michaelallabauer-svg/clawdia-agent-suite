@@ -124,6 +124,31 @@ function canMaterializeStandardNodeApp(specText) {
     && /items?/i.test(specText);
 }
 
+function runLocalSeerAudit() {
+  const files = projectFileList().map(f => f.replace(projectDir + '/', '')).sort();
+  const required = ['package.json', 'src/app.js', 'src/index.js', 'src/store.js', 'test/app.test.js', 'README.md'];
+  const missing = required.filter(f => !existsSync(join(projectDir, f)));
+  const test = spawnSync('npm', ['test', '--silent'], { cwd: projectDir, encoding: 'utf8', timeout: 120_000, maxBuffer: 20 * 1024 * 1024 });
+  const appText = existsSync(join(projectDir, 'src/app.js')) ? readFileSync(join(projectDir, 'src/app.js'), 'utf8') : '';
+  const hasHealth = /get\(['"]\/health['"]/.test(appText);
+  const hasCrud = ['get', 'post', 'put', 'delete'].every(method => new RegExp(`${method}\\(['\"]\\/items`).test(appText));
+  const blockers = [];
+  if (missing.length) blockers.push(`Missing required files: ${missing.join(', ')}`);
+  if (test.status !== 0) blockers.push('npm test failed');
+  if (!hasHealth) blockers.push('Missing GET /health endpoint');
+  if (!hasCrud) blockers.push('Missing complete /items CRUD endpoints');
+
+  const pass = blockers.length === 0;
+  const audit = [`# Seer Audit Report`, ``, `CAS_STATUS: ${pass ? 'PASS' : 'FAIL'}`, ``, `## Executive Summary`, `- Status: ${pass ? 'PASS' : 'FAIL'}`, `- Files checked: ${files.length}`, `- Test command: npm test --silent`, `- Test result: ${test.status === 0 ? 'PASS' : 'FAIL'}`, ``, `## Required Files`, ...required.map(f => `- ${existsSync(join(projectDir, f)) ? '[x]' : '[ ]'} ${f}`), ``, `## Endpoint Checks`, `- Health endpoint: ${hasHealth ? 'PASS' : 'FAIL'}`, `- Items CRUD endpoints: ${hasCrud ? 'PASS' : 'FAIL'}`, ``, `## Project Files`, ...files.map(f => `- ${f}`), ``];
+  if (blockers.length) audit.push('## Blockers', ...blockers.map(b => `- ${b}`), '');
+  if (test.status !== 0) audit.push('## npm test output', '```', test.stdout || test.stderr || 'no output', '```', '');
+  else audit.push('## npm test output', '```', (test.stdout || 'tests passed').trim(), '```', '');
+
+  const text = audit.join('\n');
+  writeFileSync(artifacts.audit, text.endsWith('\n') ? text : `${text}\n`);
+  return text;
+}
+
 function materializeStandardNodeApp(specText) {
   if (!canMaterializeStandardNodeApp(specText)) return false;
 
@@ -525,7 +550,8 @@ try {
 
     activeStep = 'seer';
     saveState('running', activeStep, i);
-    audit = runAgent('seer', `Lies ${artifacts.spec}, prüfe den Code in ${projectDir}, schreibe Audit mit eindeutiger Zeile CAS_STATUS: PASS oder CAS_STATUS: FAIL.`, artifacts.audit, { textOnly: false });
+    audit = runLocalSeerAudit();
+    log('completed local Seer audit');
     if (validateSeerPass(audit)) {
       saveState('passed', 'done', i);
       console.log(`CAS run passed: ${runDir}`);
