@@ -93,6 +93,24 @@ function validateSeerPass(auditText) {
   return /^CAS_STATUS:\s*PASS\s*$/im.test(auditText);
 }
 
+function extractVisibleOutput(stdout) {
+  const trimmed = stdout.trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = JSON.parse(trimmed);
+    const payloads = parsed?.result?.payloads;
+    if (Array.isArray(payloads)) {
+      const text = payloads.map(p => p?.text || '').filter(Boolean).join('\n\n').trim();
+      if (text) return text;
+    }
+    const metaText = parsed?.result?.meta?.finalAssistantVisibleText || parsed?.result?.meta?.finalAssistantRawText;
+    if (typeof metaText === 'string' && metaText.trim()) return metaText.trim();
+  } catch {
+    // stdout may already be plain text.
+  }
+  return trimmed;
+}
+
 function runAgent(agent, message, outPath) {
   log(`starting ${agent}; expected artifact: ${outPath}`);
   const fullMessage = `${readFileSync(promptPath(agent), 'utf8')}\n\n---\n\n# Orchestrator-Anweisung\n\nRUN_DIR: ${runDir}\nPROJECT_DIR: ${projectDir}\n\n${message}\n\nSchreibe dein finales Artefakt nach: ${outPath}\nArbeite ausschließlich in RUN_DIR/PROJECT_DIR. Keine Dateien in deinem Agenten-Workspace ablegen. Verwende absolute Pfade.`;
@@ -108,9 +126,15 @@ function runAgent(agent, message, outPath) {
     throw new Error(`${agent} failed after ${elapsed}s: ${detail}`);
   }
   if (!existsSync(outPath)) {
-    // Preserve visible CLI output for diagnosis, but treat missing artifacts as failure.
-    writeFileSync(outPath, `# ${agent} output fallback\n\n\`\`\`json\n${res.stdout.trim()}\n\`\`\`\n`);
-    throw new Error(`${agent} completed after ${elapsed}s but did not write expected artifact: ${outPath}`);
+    const visibleOutput = extractVisibleOutput(res.stdout);
+    if (visibleOutput) {
+      writeFileSync(outPath, visibleOutput.endsWith('\n') ? visibleOutput : `${visibleOutput}\n`);
+      log(`recovered ${agent} artifact from visible agent output`);
+    } else {
+      // Preserve raw CLI output for diagnosis, but treat empty/missing artifacts as failure.
+      writeFileSync(outPath, `# ${agent} output fallback\n\n\`\`\`json\n${res.stdout.trim()}\n\`\`\`\n`);
+      throw new Error(`${agent} completed after ${elapsed}s but did not write expected artifact: ${outPath}`);
+    }
   }
   log(`finished ${agent} in ${elapsed}s`);
   return readFileSync(outPath, 'utf8');
