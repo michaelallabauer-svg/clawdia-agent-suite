@@ -9,16 +9,17 @@ const args = process.argv.slice(2);
 const inputArg = args.find(a => a === '--input') ? args[args.indexOf('--input') + 1] : null;
 const titleArg = args.find(a => a === '--title') ? args[args.indexOf('--title') + 1] : null;
 const maxIterations = Number(args.find(a => a === '--max-iterations') ? args[args.indexOf('--max-iterations') + 1] : 2);
+const runIdArg = args.find(a => a === '--run-id') ? args[args.indexOf('--run-id') + 1] : null;
 const dryRun = args.includes('--dry-run');
 
 if (!inputArg) {
-  console.error('Usage: node scripts/cas-runner.mjs --input <text-or-file> [--title slug] [--max-iterations 2] [--dry-run]');
+  console.error('Usage: node scripts/cas-runner.mjs --input <text-or-file> [--title slug] [--max-iterations 2] [--run-id id] [--dry-run]');
   process.exit(2);
 }
 
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
 const slug = (titleArg || inputArg).toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-').replace(/^-|-$/g, '').slice(0, 48) || 'cas-run';
-const runId = `${stamp}-${slug}`;
+const runId = runIdArg || `${stamp}-${slug}`;
 const runDir = resolve(repo, 'runs', runId);
 const projectDir = join(runDir, 'project');
 mkdirSync(projectDir, { recursive: true });

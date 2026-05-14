@@ -67,6 +67,27 @@ clawdia-agent-suite/
     └── .gitkeep
 ```
 
+
+## Chat-/Telegram-Trigger
+
+CAS kann über den installierten Skill `cas-start` aus Chat/Telegram gestartet werden. Je nach Oberfläche geht das z.B. so:
+
+```text
+/cas_start Baue eine kleine To-Do App mit Login
+```
+
+oder generisch:
+
+```text
+/skill cas-start Baue eine kleine To-Do App mit Login
+```
+
+Der Skill ruft im Hintergrund `scripts/cas-start.mjs` auf. Dieser startet `scripts/cas-runner.mjs` detached und gibt sofort `runId`, `runDir` und `projectDir` zurück. Fortschritt liegt dann in:
+
+- `runs/<run-id>/state.json`
+- `runs/<run-id>/runner.stdout.log`
+- `runs/<run-id>/runner.stderr.log`
+
 ## Schnellstart lokal
 
 ```bash
