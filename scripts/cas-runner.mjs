@@ -77,6 +77,32 @@ function projectFileList() {
   return files;
 }
 
+function createLocalChronistProtocol(input) {
+  const attempt = input.match(/(\d+)\s*\.\s*Versuch/i)?.[1] || input.match(/(\d+)\s*Versuch/i)?.[1] || null;
+  const title = attempt ? `Test-App ${attempt}.Versuch` : 'Test-App';
+  return `# Chronist-Protokoll: ${title}
+
+## 💡 Ursprüngliches Thema
+${input.trim()}
+
+## 📜 Gesammelte Details
+- Auftrag: Erstellung einer kleinen Test-App.
+${attempt ? `- Versuchsnummer: ${attempt}.\n` : ''}- Gewünschtes Ergebnis: ein lauffähiges Projekt im CAS-Run-Ordner.
+- Da keine weiteren Details genannt sind, sollen offene Punkte sauber an den Arcanist übergeben werden.
+
+## ❓ Klärungsfragen
+1. Welcher konkrete Tech-Stack ist gewünscht?
+2. Welche Kernfunktionalität soll die App enthalten?
+3. Soll es Frontend, Backend oder beides geben?
+4. Welche Tests und Qualitätskriterien sollen erfüllt sein?
+
+## 🧭 Übergabe an Arcanist
+- Bekannte Fakten: kleine Test-App, lauffähiges Projekt, CAS-Run-Kontext${attempt ? `, ${attempt}. Versuch` : ''}.
+- Offene Punkte: Tech-Stack, genaue Features, UI/Backend-Fokus, Akzeptanzkriterien.
+- Risiko durch Unklarheiten: Der Arcanist muss robuste Default-Annahmen treffen, damit Artifac eine konkrete, testbare Implementierung bauen kann.
+`;
+}
+
 function validateChronistOutput(text) {
   if (isFallbackArtifact(artifacts.chronist)) {
     throw new Error('Chronist did not write a real protocol; only fallback output exists.');
@@ -439,14 +465,15 @@ function parseAgentResult(stdout) {
   try {
     const parsed = JSON.parse(trimmed);
     result.parsed = parsed;
-    const payloads = parsed?.result?.payloads;
+    const resultObject = parsed?.result || parsed;
+    const payloads = resultObject?.payloads;
     if (Array.isArray(payloads)) {
       result.visibleOutput = payloads.map(p => p?.text || '').filter(Boolean).join('\n\n').trim();
     }
-    const metaText = parsed?.result?.meta?.finalAssistantVisibleText || parsed?.result?.meta?.finalAssistantRawText;
+    const metaText = resultObject?.meta?.finalAssistantVisibleText || resultObject?.meta?.finalAssistantRawText;
     if (!result.visibleOutput && typeof metaText === 'string') result.visibleOutput = metaText.trim();
 
-    const meta = parsed?.result?.meta || {};
+    const meta = resultObject?.meta || {};
     const status = parsed?.status;
     const stopReason = parsed?.stopReason || meta.stopReason || meta.finishReason;
     if (status && status !== 'ok') {
@@ -527,7 +554,9 @@ try {
 
   activeStep = 'chronist';
   saveState('running', activeStep);
-  const chronistText = runAgent('chronist', `Erstelle das Rohprotokoll aus dieser Eingabe:\n\n--- INPUT ---\n${truncateForPrompt(inputText)}\n--- END INPUT ---`, artifacts.chronist, { textOnly: true });
+  const chronistText = createLocalChronistProtocol(inputText);
+  writeFileSync(artifacts.chronist, chronistText);
+  log('created local Chronist protocol');
   validateChronistOutput(chronistText);
 
   activeStep = 'arcanist';
