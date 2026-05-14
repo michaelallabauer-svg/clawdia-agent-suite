@@ -9,9 +9,10 @@ const args = process.argv.slice(2);
 const inputArg = args.find(a => a === '--input') ? args[args.indexOf('--input') + 1] : args.join(' ').trim();
 const titleArg = args.find(a => a === '--title') ? args[args.indexOf('--title') + 1] : null;
 const maxIterations = args.find(a => a === '--max-iterations') ? args[args.indexOf('--max-iterations') + 1] : '2';
+const projectArg = args.find(a => a === '--project') ? args[args.indexOf('--project') + 1] : null;
 
 if (!inputArg) {
-  console.error('Usage: node scripts/cas-start.mjs --input <text-or-file> [--title slug] [--max-iterations 2]');
+  console.error('Usage: node scripts/cas-start.mjs --input <text-or-file> [--title slug] [--project existing-project-dir] [--max-iterations 2]');
   process.exit(2);
 }
 
@@ -30,7 +31,9 @@ writeFileSync(join(runDir, 'start.json'), JSON.stringify({
   startedAt: new Date().toISOString(),
   title: titleArg || slug,
   maxIterations: Number(maxIterations),
-  status: 'started'
+  status: 'started',
+  mode: projectArg ? 'existing-project' : 'greenfield',
+  sourceProjectDir: projectArg || null
 }, null, 2) + '\n');
 
 const out = openSync(stdoutPath, 'a');
@@ -40,7 +43,8 @@ const child = spawn(process.execPath, [
   '--input', inputArg,
   '--title', titleArg || slug,
   '--max-iterations', String(maxIterations),
-  '--run-id', runId
+  '--run-id', runId,
+  ...(projectArg ? ['--project', projectArg] : [])
 ], {
   cwd: repo,
   detached: true,
@@ -54,6 +58,8 @@ console.log(JSON.stringify({
   pid: child.pid,
   runDir,
   projectDir: join(runDir, 'project'),
+  mode: projectArg ? 'existing-project' : 'greenfield',
+  sourceProjectDir: projectArg || null,
   stateFile: join(runDir, 'state.json'),
   stdout: stdoutPath,
   stderr: stderrPath

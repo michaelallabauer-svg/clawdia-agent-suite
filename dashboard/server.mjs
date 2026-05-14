@@ -31,7 +31,8 @@ const ARTIFACTS = {
   state: 'state.json',
   stdout: 'runner.stdout.log',
   stderr: 'runner.stderr.log',
-  start: 'start.json'
+  start: 'start.json',
+  projectManifest: 'project_manifest.json'
 };
 
 function send(res, status, body, headers = {}) {
@@ -83,7 +84,7 @@ function runSummary(runId) {
   const state = readJson(join(dir, 'state.json'), {});
   const start = readJson(join(dir, 'start.json'), {});
   const buildReportPath = join(dir, ARTIFACTS.buildReport);
-  const mode = existsSync(buildReportPath) && readText(buildReportPath, 20_000).includes('Deterministic CAS materializer') ? 'deterministic' : 'agentic';
+  const mode = state.mode || start.mode || (existsSync(join(dir, 'project_manifest.json')) ? 'existing-project' : (existsSync(buildReportPath) && readText(buildReportPath, 20_000).includes('Deterministic CAS materializer') ? 'deterministic' : 'agentic'));
   const files = {};
   for (const [key, file] of Object.entries(ARTIFACTS)) {
     const path = join(dir, file);
@@ -100,6 +101,7 @@ function runSummary(runId) {
     status: state.status || start.status || 'unknown',
     currentStep: state.currentStep || 'unknown',
     mode,
+    sourceProjectDir: state.sourceProjectDir || start.sourceProjectDir || null,
     iterations: state.iterations ?? 0,
     lastError: state.lastError || null,
     startedAt: start.startedAt || null,
@@ -120,13 +122,14 @@ function slugify(text) {
   return String(text || 'cas-run').toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-').replace(/^-|-$/g, '').slice(0, 48) || 'cas-run';
 }
 
-function startCas({ input, title, maxIterations = 2 }) {
+function startCas({ input, title, maxIterations = 2, project = '' }) {
   if (!input || !String(input).trim()) throw new Error('input required');
   const child = spawn(process.execPath, [
     join(repo, 'scripts', 'cas-start.mjs'),
     '--input', String(input),
     '--title', slugify(title || input),
-    '--max-iterations', String(maxIterations)
+    '--max-iterations', String(maxIterations),
+    ...(project ? ['--project', String(project)] : [])
   ], { cwd: repo, encoding: 'utf8' });
   return new Promise((resolveStart, reject) => {
     let out = '', err = '';
@@ -149,11 +152,13 @@ function stepInfo(runId, agent) {
     artifac: join(dir, '03_artifac_report.md'),
     seer: join(dir, '04_seer_audit.md')
   }[agent];
+  const existing = existsSync(join(dir, 'project_manifest.json'));
+  const modeHint = existing ? 'Dies ist ein Existing-Project-Run. Behandle project/ als Arbeitskopie eines bestehenden Repos und ändere ausschließlich diese Kopie.' : '';
   const message = {
-    chronist: `Lies ${join(dir, '00_input.md')} und erstelle das Rohprotokoll.`,
-    arcanist: `Lies ${join(dir, '01_chronist.md')} und erstelle eine ausführbare Spezifikation.`,
-    artifac: `Lies ${join(dir, '02_arcanist_spec.md')}. Implementiere ausschließlich in ${projectDir}.`,
-    seer: `Lies ${join(dir, '02_arcanist_spec.md')}, prüfe den Code in ${projectDir}, schreibe Audit mit eindeutiger Zeile CAS_STATUS: PASS oder CAS_STATUS: FAIL.`
+    chronist: `Lies ${join(dir, '00_input.md')} und erstelle das Rohprotokoll. ${modeHint}`,
+    arcanist: `Lies ${join(dir, '01_chronist.md')} und erstelle eine kleine, ausführbare Spezifikation. ${modeHint}`,
+    artifac: `Lies ${join(dir, '02_arcanist_spec.md')}. Implementiere ausschließlich in ${projectDir}. ${modeHint}`,
+    seer: `Lies ${join(dir, '02_arcanist_spec.md')}, prüfe den Code in ${projectDir}, schreibe Audit mit eindeutiger Zeile CAS_STATUS: PASS oder CAS_STATUS: FAIL. ${modeHint}`
   }[agent];
   if (!artifact || !message) throw new Error('unknown agent');
   return { dir, projectDir, artifact, message };

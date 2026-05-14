@@ -160,6 +160,33 @@ Der Runner erzeugt einen Run-Ordner und führt den Workflow sequenziell aus. Fü
 
 So entstehen reproduzierbare Projektdateien und ein echtes `npm test`-Gate, statt fragile Tool-Use-Loops laufen zu lassen.
 
+
+## Existing-Project Mode
+
+Für bestehende Repositories wie `visiontrack-finance` kann CAS jetzt ticketbasiert mit einer Arbeitskopie arbeiten:
+
+```bash
+node scripts/cas-start.mjs \
+  --project /Users/michaelallabauer/.openclaw/workspace/visiontrack-finance \
+  --title visiontrack-startbar-machen \
+  --input "Ticket 1: App startbar machen, Entry-Points und kaputte Imports reparieren, minimalen Smoke-Test ergänzen"
+```
+
+Dabei wird das Quellprojekt nicht direkt verändert. CAS kopiert es nach:
+
+```text
+runs/<run-id>/project/
+```
+
+Zusätzlich entsteht `project_manifest.json` mit Quellpfad, Copy-Excludes, package.json-Summary und Datei-Inventar. Das Dashboard zeigt den Modus `existing-project` und den Source Project Pfad an.
+
+Empfohlener Ablauf für bestehende Produkte:
+
+1. kleines Ticket formulieren
+2. CAS-Run mit `--project` starten
+3. Artefakte/Tests im Dashboard prüfen
+4. bei PASS/Fixstand: Änderungen aus `runs/<run-id>/project/` reviewen und bewusst zurück ins Originalrepo übernehmen
+
 ## Agenten und empfohlene Modelle
 
 | Agent | Rolle | Modell |

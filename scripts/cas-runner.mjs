@@ -2,6 +2,12 @@
 import { spawnSync } from 'node:child_process';
 import { materializeStandardNodeApp } from '../04_RUNTIME/materializers/node-express-crud.mjs';
 import { runNodeExpressCrudAudit } from '../04_RUNTIME/auditors/node-express-crud.mjs';
+import {
+  copyExistingProject,
+  createExistingProjectChronistProtocol,
+  runExistingProjectAudit,
+  writeExistingProjectManifest
+} from '../04_RUNTIME/existing-project.mjs';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,10 +18,11 @@ const inputArg = args.find(a => a === '--input') ? args[args.indexOf('--input') 
 const titleArg = args.find(a => a === '--title') ? args[args.indexOf('--title') + 1] : null;
 const maxIterations = Number(args.find(a => a === '--max-iterations') ? args[args.indexOf('--max-iterations') + 1] : 2);
 const runIdArg = args.find(a => a === '--run-id') ? args[args.indexOf('--run-id') + 1] : null;
+const projectArg = args.find(a => a === '--project') ? args[args.indexOf('--project') + 1] : null;
 const dryRun = args.includes('--dry-run');
 
 if (!inputArg) {
-  console.error('Usage: node scripts/cas-runner.mjs --input <text-or-file> [--title slug] [--max-iterations 2] [--run-id id] [--dry-run]');
+  console.error('Usage: node scripts/cas-runner.mjs --input <text-or-file> [--title slug] [--project existing-project-dir] [--max-iterations 2] [--run-id id] [--dry-run]');
   process.exit(2);
 }
 
@@ -25,6 +32,7 @@ const runId = runIdArg || `${stamp}-${slug}`;
 const runDir = resolve(repo, 'runs', runId);
 const projectDir = join(runDir, 'project');
 mkdirSync(projectDir, { recursive: true });
+const mode = projectArg ? 'existing-project' : 'greenfield';
 
 const inputText = existsSync(resolve(inputArg)) ? readFileSync(resolve(inputArg), 'utf8') : inputArg;
 writeFileSync(join(runDir, '00_input.md'), inputText.trim() + '\n');
@@ -37,6 +45,12 @@ const artifacts = {
   audit: join(runDir, '04_seer_audit.md')
 };
 
+let existingProjectManifest = null;
+if (projectArg) {
+  const copied = copyExistingProject({ sourceDir: projectArg, projectDir });
+  existingProjectManifest = writeExistingProjectManifest({ runDir, sourceDir: copied.source, projectDir });
+}
+
 let activeStep = 'created';
 let activeIteration = 0;
 
@@ -46,7 +60,19 @@ function log(message) {
 
 function saveState(status, currentStep, iterations = 0, lastError = null) {
   writeFileSync(join(runDir, 'state.json'), JSON.stringify({
-    runId, status, currentStep, runDir, projectDir, iterations, lastError, artifacts
+    runId,
+    status,
+    currentStep,
+    mode,
+    sourceProjectDir: existingProjectManifest?.sourceProjectDir || null,
+    runDir,
+    projectDir,
+    iterations,
+    lastError,
+    artifacts: {
+      ...artifacts,
+      ...(existingProjectManifest ? { projectManifest: join(runDir, 'project_manifest.json') } : {})
+    }
   }, null, 2) + '\n');
 }
 
@@ -253,9 +279,11 @@ try {
 
   activeStep = 'chronist';
   saveState('running', activeStep);
-  const chronistText = createLocalChronistProtocol(inputText);
+  const chronistText = existingProjectManifest
+    ? createExistingProjectChronistProtocol({ input: inputText, manifest: existingProjectManifest })
+    : createLocalChronistProtocol(inputText);
   writeFileSync(artifacts.chronist, chronistText);
-  log('created local Chronist protocol');
+  log(`created local Chronist protocol (${mode})`);
   validateChronistOutput(chronistText);
 
   activeStep = 'arcanist';
@@ -269,17 +297,23 @@ try {
     activeStep = i === 0 ? 'artifac' : 'artifac-fix';
     saveState('running', activeStep, i);
     const fixContext = i === 0 ? '' : `Zusätzlich liegt ein Seer-FAIL in ${artifacts.audit}. Behebe die dort genannten Fehler.`;
-    if (i === 0 && materializeStandardNodeApp({ specText, projectDir, buildReportPath: artifacts.buildReport })) {
+    if (!existingProjectManifest && i === 0 && materializeStandardNodeApp({ specText, projectDir, buildReportPath: artifacts.buildReport })) {
       log('materialized standard Node.js test app without agent tool calls');
     } else {
-      runAgent('artifac', `Lies ${artifacts.spec}. Implementiere ausschließlich in ${projectDir}. ${fixContext}`, artifacts.buildReport);
+      const projectContext = existingProjectManifest
+        ? `Dies ist ein Existing-Project-Run. Das Quellprojekt wurde als Arbeitskopie nach ${projectDir} kopiert. Verändere ausschließlich diese Arbeitskopie. Erzeuge einen kleinen, reviewbaren Patch für die Spezifikation.`
+        : '';
+      runAgent('artifac', `Lies ${artifacts.spec}. Implementiere ausschließlich in ${projectDir}. ${projectContext} ${fixContext}`, artifacts.buildReport);
     }
-    validateArtifacOutput();
+    if (!existingProjectManifest) validateArtifacOutput();
+    else if (isFallbackArtifact(artifacts.buildReport)) throw new Error('Artifac did not write a real build report; only fallback output exists.');
 
     activeStep = 'seer';
     saveState('running', activeStep, i);
-    audit = runNodeExpressCrudAudit({ projectDir, auditPath: artifacts.audit }).text;
-    log('completed local Seer audit');
+    audit = existingProjectManifest
+      ? runExistingProjectAudit({ projectDir, auditPath: artifacts.audit }).text
+      : runNodeExpressCrudAudit({ projectDir, auditPath: artifacts.audit }).text;
+    log(`completed local Seer audit (${mode})`);
     if (validateSeerPass(audit)) {
       saveState('passed', 'done', i);
       console.log(`CAS run passed: ${runDir}`);

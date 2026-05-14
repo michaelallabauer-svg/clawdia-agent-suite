@@ -38,9 +38,10 @@ async function renderDetail(runId) {
   $('mode').className = `modeBadge ${run.mode || 'agentic'}`;
   $('runDir').textContent = run.runDir;
   $('projectDir').textContent = run.projectDir;
+  $('sourceProjectDir').textContent = run.sourceProjectDir || '—';
   $('lastError').textContent = run.lastError || '—';
   const buttons = $('artifactButtons'); buttons.innerHTML = '';
-  for (const key of ['input','chronist','spec','buildReport','audit','state','stdout','stderr','start']) {
+  for (const key of ['input','chronist','spec','buildReport','audit','projectManifest','state','stdout','stderr','start']) {
     const b = document.createElement('button');
     b.textContent = key;
     b.disabled = !run.files[key];
@@ -57,7 +58,7 @@ $('refresh').onclick = loadRuns;
 $('start').onclick = async () => {
   $('startResult').textContent = 'Starte…';
   try {
-    const data = await api('/api/start', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ input:$('input').value, title:$('title').value, maxIterations:Number($('maxIterations').value || 2) }) });
+    const data = await api('/api/start', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ input:$('input').value, title:$('title').value, project:$('project').value.trim(), maxIterations:Number($('maxIterations').value || 2) }) });
     $('startResult').textContent = JSON.stringify(data, null, 2);
     selectedRun = data.runId;
     await loadRuns(); await renderDetail(data.runId);

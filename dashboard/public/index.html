@@ -19,6 +19,7 @@
       <h2>Neuen CAS-Run starten</h2>
       <label>Titel/Slug <input id="title" placeholder="todo-auth-app" /></label>
       <label>Auftrag <textarea id="input" rows="5" placeholder="Baue eine kleine To-Do App mit Login"></textarea></label>
+      <label>Bestehendes Projekt (optional) <input id="project" placeholder="/Users/michaelallabauer/.openclaw/workspace/visiontrack-finance" /></label>
       <label>Max. Iterationen <input id="maxIterations" type="number" min="0" max="10" value="2" /></label>
       <button id="start">Run starten</button>
       <pre id="startResult" class="result"></pre>
@@ -44,6 +45,7 @@
             <dt>Mode</dt><dd><span id="mode" class="modeBadge"></span></dd>
             <dt>Run Dir</dt><dd><code id="runDir"></code></dd>
             <dt>Project Dir</dt><dd><code id="projectDir"></code></dd>
+            <dt>Source Project</dt><dd><code id="sourceProjectDir"></code></dd>
             <dt>Error</dt><dd id="lastError"></dd>
           </dl>
 
