@@ -161,9 +161,20 @@ function parseAgentResult(stdout) {
   return result;
 }
 
-function runAgent(agent, message, outPath) {
+function truncateForPrompt(text, max = 120_000) {
+  return text.length > max ? `${text.slice(0, max)}\n\n[... truncated ${text.length - max} chars ...]` : text;
+}
+
+function runAgent(agent, message, outPath, options = {}) {
   log(`starting ${agent}; expected artifact: ${outPath}`);
-  const fullMessage = `${readFileSync(promptPath(agent), 'utf8')}\n\n---\n\n# Orchestrator-Anweisung\n\nRUN_DIR: ${runDir}\nPROJECT_DIR: ${projectDir}\n\n${message}\n\nSchreibe dein finales Artefakt nach: ${outPath}\nArbeite ausschließlich in RUN_DIR/PROJECT_DIR. Keine Dateien in deinem Agenten-Workspace ablegen. Verwende absolute Pfade.`;
+  const textOnly = options.textOnly === true;
+  const outputInstruction = textOnly
+    ? `Gib ausschließlich den finalen Inhalt für ${outPath} als Markdown/Text zurück. Verwende keine Tools, keine Tool-Calls, kein Lesen/Schreiben von Dateien. Der CAS-Runner speichert deine Antwort.`
+    : `Schreibe dein finales Artefakt nach: ${outPath}`;
+  const workspaceInstruction = textOnly
+    ? `Arbeite nur mit dem unten eingebetteten Kontext. Keine Tool-Nutzung.`
+    : `Arbeite ausschließlich in RUN_DIR/PROJECT_DIR. Keine Dateien in deinem Agenten-Workspace ablegen. Verwende absolute Pfade.`;
+  const fullMessage = `${readFileSync(promptPath(agent), 'utf8')}\n\n---\n\n# Orchestrator-Anweisung\n\nRUN_DIR: ${runDir}\nPROJECT_DIR: ${projectDir}\n\n${message}\n\n${outputInstruction}\n${workspaceInstruction}`;
   const started = Date.now();
   const res = spawnSync('openclaw', ['agent', '--agent', agent, '--session-id', sessionIdFor(agent), '--message', fullMessage, '--timeout', '900', '--json'], {
     cwd: runDir,
@@ -210,12 +221,12 @@ try {
 
   activeStep = 'chronist';
   saveState('running', activeStep);
-  const chronistText = runAgent('chronist', `Lies ${artifacts.input} und erstelle das Rohprotokoll.`, artifacts.chronist);
+  const chronistText = runAgent('chronist', `Erstelle das Rohprotokoll aus dieser Eingabe:\n\n--- INPUT ---\n${truncateForPrompt(inputText)}\n--- END INPUT ---`, artifacts.chronist, { textOnly: true });
   validateChronistOutput(chronistText);
 
   activeStep = 'arcanist';
   saveState('running', activeStep);
-  const specText = runAgent('arcanist', `Lies ${artifacts.chronist} und erstelle eine ausführbare Spezifikation.`, artifacts.spec);
+  const specText = runAgent('arcanist', `Erstelle eine ausführbare Spezifikation aus diesem Chronist-Protokoll:\n\n--- CHRONIST ---\n${truncateForPrompt(chronistText)}\n--- END CHRONIST ---`, artifacts.spec, { textOnly: true });
   validateArcanistOutput(specText);
 
   let audit = '';
@@ -229,7 +240,7 @@ try {
 
     activeStep = 'seer';
     saveState('running', activeStep, i);
-    audit = runAgent('seer', `Lies ${artifacts.spec}, prüfe den Code in ${projectDir}, schreibe Audit mit eindeutiger Zeile CAS_STATUS: PASS oder CAS_STATUS: FAIL.`, artifacts.audit);
+    audit = runAgent('seer', `Lies ${artifacts.spec}, prüfe den Code in ${projectDir}, schreibe Audit mit eindeutiger Zeile CAS_STATUS: PASS oder CAS_STATUS: FAIL.`, artifacts.audit, { textOnly: false });
     if (validateSeerPass(audit)) {
       saveState('passed', 'done', i);
       console.log(`CAS run passed: ${runDir}`);
