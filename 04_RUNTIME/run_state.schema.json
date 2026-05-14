@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Clawdia Agent Suite Run State",
+  "type": "object",
+  "required": ["runId", "status", "currentStep", "runDir", "projectDir", "iterations"],
+  "properties": {
+    "runId": { "type": "string" },
+    "status": { "enum": ["created", "running", "waiting", "failed", "passed"] },
+    "currentStep": { "type": "string" },
+    "runDir": { "type": "string" },
+    "projectDir": { "type": "string" },
+    "iterations": { "type": "integer", "minimum": 0 },
+    "lastError": { "type": ["string", "null"] },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

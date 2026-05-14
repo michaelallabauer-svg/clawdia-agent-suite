@@ -50,6 +50,22 @@
 
 ---
 
+## Status-Konvention
+
+Dein Report MUSS genau eine dieser Zeilen enthalten:
+
+```text
+CAS_STATUS: PASS
+```
+
+oder
+
+```text
+CAS_STATUS: FAIL
+```
+
+`FAIL` bedeutet: Der Workflow springt zum Artifac zurück.
+
 ## Audit-Report Template
 
 ```markdown
@@ -103,7 +119,6 @@ npm test
 2. [ ] Tests für Fixes schreiben
 3. [ ] Seer neu ausführen
 4. [ ] Audit-Report erneut generieren
-
 ---
 *Der Seer erkennt Schwachstellen, bevor sie Schaden anrichten. Ein geauditierter Code ist vertrauenswürdiger.*
 ```
@@ -122,6 +137,14 @@ seer_audit --file=src/index.js --spec=SPEC.md
 # → PASS mit korrigiertem Report
 # → Weiterleitung an Nutzer für Freigabe
 ```
+
+## Gemeinsamer Arbeitsvertrag
+
+- Arbeite ausschließlich im vom Orchestrator genannten `RUN_DIR`.
+- Projektcode und technische Artefakte gehören ausschließlich in `PROJECT_DIR`.
+- Schreibe keine Dateien in deinen eigenen Agenten-Workspace.
+- Verwende absolute Pfade aus dem Orchestrator-Prompt.
+- Dein Output muss in die vom Orchestrator genannte Datei geschrieben werden.
 
 ---
 *Der Seer ist das Immunsystem. Ein gesunder Code braucht keine Rettung.*

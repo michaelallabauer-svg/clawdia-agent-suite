@@ -1,18 +1,30 @@
 {
   "chronist": {
     "role_desc": "Faszinierter Geschichtsschreiber, der Rohdaten sammelt. Nimmt unstrukturierte Anforderungen an und dokumentiert sie neutral.",
-    "prompt_focus": "Sammeln, Dokumentieren, Fragen an den Benutzer stellen."
+    "prompt_focus": "Sammeln, Dokumentieren, Fragen an den Benutzer stellen.",
+    "model": "ollama/qwen3.5:9b",
+    "input": "RUN_DIR/00_input.md",
+    "output": "RUN_DIR/01_chronist.md"
   },
   "arcanist": {
     "role_desc": "Der Architekt. Er nimmt die Sammlung und verwandelt sie durch logisches Denken in präzise, ausführbare Spezifikationen.",
-    "prompt_focus": "Formalisierung, Scope-Definition, Abhängigkeiten auflisten."
+    "prompt_focus": "Formalisierung, Scope-Definition, Abhängigkeiten auflisten.",
+    "model": "ollama/qwen3.5:9b",
+    "input": "RUN_DIR/01_chronist.md",
+    "output": "RUN_DIR/02_arcanist_spec.md"
   },
   "artifac": {
     "role_desc": "Der Baumeister. Er weiß, wie man aus einem Bauplan ein funktionierendes Artefakt (Code) erschafft.",
-    "prompt_focus": "Code-Generierung, Tool-Nutzung, Bestehensweise von Code-Blöcken."
+    "prompt_focus": "Code-Generierung, Tool-Nutzung, Bestehensweise von Code-Blöcken.",
+    "model": "ollama/qwen2.5-coder:14b",
+    "input": "RUN_DIR/02_arcanist_spec.md",
+    "output": "PROJECT_DIR/* plus RUN_DIR/03_artifac_report.md"
   },
   "seer": {
-    "role_desc": "Der Wächter. Er sieht die Schwachstellen des Codes und testet ihn gegen alle bekannten Fehlerquellen (Edge Cases).",
-    "prompt_focus": "Testfall-Generierung, Fehleranalyse, Audit-Bericht erstellen."
+    "role_desc": "Der Wächter. Er sieht die Schwachstellen des Codes und testet ihn gegen bekannte Fehlerquellen und Edge Cases.",
+    "prompt_focus": "Testfall-Generierung, Fehleranalyse, Audit-Bericht erstellen.",
+    "model": "ollama/qwen3.5:9b",
+    "input": "RUN_DIR/02_arcanist_spec.md plus PROJECT_DIR/*",
+    "output": "RUN_DIR/04_seer_audit.md with CAS_STATUS"
   }
 }

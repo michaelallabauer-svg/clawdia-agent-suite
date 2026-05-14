@@ -1,0 +1,93 @@
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { resolve, join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const args = process.argv.slice(2);
+const inputArg = args.find(a => a === '--input') ? args[args.indexOf('--input') + 1] : null;
+const titleArg = args.find(a => a === '--title') ? args[args.indexOf('--title') + 1] : null;
+const maxIterations = Number(args.find(a => a === '--max-iterations') ? args[args.indexOf('--max-iterations') + 1] : 2);
+const dryRun = args.includes('--dry-run');
+
+if (!inputArg) {
+  console.error('Usage: node scripts/cas-runner.mjs --input <text-or-file> [--title slug] [--max-iterations 2] [--dry-run]');
+  process.exit(2);
+}
+
+const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+const slug = (titleArg || inputArg).toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-').replace(/^-|-$/g, '').slice(0, 48) || 'cas-run';
+const runId = `${stamp}-${slug}`;
+const runDir = resolve(repo, 'runs', runId);
+const projectDir = join(runDir, 'project');
+mkdirSync(projectDir, { recursive: true });
+
+const inputText = existsSync(resolve(inputArg)) ? readFileSync(resolve(inputArg), 'utf8') : inputArg;
+writeFileSync(join(runDir, '00_input.md'), inputText.trim() + '\n');
+
+const artifacts = {
+  input: join(runDir, '00_input.md'),
+  chronist: join(runDir, '01_chronist.md'),
+  spec: join(runDir, '02_arcanist_spec.md'),
+  buildReport: join(runDir, '03_artifac_report.md'),
+  audit: join(runDir, '04_seer_audit.md')
+};
+
+function saveState(status, currentStep, iterations = 0, lastError = null) {
+  writeFileSync(join(runDir, 'state.json'), JSON.stringify({
+    runId, status, currentStep, runDir, projectDir, iterations, lastError, artifacts
+  }, null, 2) + '\n');
+}
+
+function promptPath(name) {
+  return join(repo, '02_SPECS', `${name}_prompt.md`);
+}
+
+function runAgent(agent, model, message, outPath) {
+  const fullMessage = `${readFileSync(promptPath(agent), 'utf8')}\n\n---\n\n# Orchestrator-Anweisung\n\nRUN_DIR: ${runDir}\nPROJECT_DIR: ${projectDir}\n\n${message}\n\nSchreibe dein finales Artefakt nach: ${outPath}\nArbeite ausschließlich in RUN_DIR/PROJECT_DIR. Keine Dateien in deinem Agenten-Workspace ablegen. Verwende absolute Pfade.`;
+  const res = spawnSync('openclaw', ['agent', '--agent', agent, '--model', model, '--message', fullMessage, '--timeout', '900', '--json'], {
+    cwd: runDir,
+    encoding: 'utf8',
+    maxBuffer: 50 * 1024 * 1024
+  });
+  if (res.status !== 0) throw new Error(`${agent} failed: ${res.stderr || res.stdout}`);
+  if (!existsSync(outPath)) {
+    // Fallback: preserve visible CLI output so the handoff is not lost.
+    writeFileSync(outPath, `# ${agent} output fallback\n\n\
+\
+\`\`\`json\n${res.stdout.trim()}\n\`\`\`\n`);
+  }
+  return readFileSync(outPath, 'utf8');
+}
+
+if (dryRun) {
+  saveState('created', 'dry-run');
+  console.log(`CAS dry run created: ${runDir}`);
+  process.exit(0);
+}
+
+saveState('running', 'chronist');
+runAgent('chronist', 'ollama/qwen3.5:9b', `Lies ${artifacts.input} und erstelle das Rohprotokoll.`, artifacts.chronist);
+
+saveState('running', 'arcanist');
+runAgent('arcanist', 'ollama/qwen3.5:9b', `Lies ${artifacts.chronist} und erstelle eine ausführbare Spezifikation.`, artifacts.spec);
+
+let audit = '';
+for (let i = 0; i <= maxIterations; i++) {
+  saveState('running', i === 0 ? 'artifac' : 'artifac-fix', i);
+  const fixContext = i === 0 ? '' : `Zusätzlich liegt ein Seer-FAIL in ${artifacts.audit}. Behebe die dort genannten Fehler.`;
+  runAgent('artifac', 'ollama/qwen2.5-coder:14b', `Lies ${artifacts.spec}. Implementiere ausschließlich in ${projectDir}. ${fixContext}`, artifacts.buildReport);
+
+  saveState('running', 'seer', i);
+  audit = runAgent('seer', 'ollama/qwen3.5:9b', `Lies ${artifacts.spec}, prüfe den Code in ${projectDir}, schreibe Audit mit eindeutiger Zeile CAS_STATUS: PASS oder CAS_STATUS: FAIL.`, artifacts.audit);
+  if (/CAS_STATUS:\s*PASS/i.test(audit)) {
+    saveState('passed', 'done', i);
+    console.log(`CAS run passed: ${runDir}`);
+    process.exit(0);
+  }
+}
+
+saveState('failed', 'seer-fail', maxIterations, 'Seer did not produce CAS_STATUS: PASS within max iterations');
+console.error(`CAS run failed after ${maxIterations} iterations: ${runDir}`);
+process.exit(1);

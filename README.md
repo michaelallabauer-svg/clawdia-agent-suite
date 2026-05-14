@@ -1,164 +1,111 @@
 # Clawdia Agent Suite (CAS) 🐾
 
-<div align="center">
-
 **AI-Driven Multi-Agent Software Development Pipeline**
 
-_Orchestriert vage Anforderungen in getesteten, dokumentierten Artefakten_
+CAS orchestriert vage Anforderungen in getestete, dokumentierte Projektartefakte. Der Workflow ist sequenziell und nutzt spezialisierte Agenten mit klaren Übergaben.
 
-</div>
+## Projektziel
 
----
+Eine Anfrage/Ticket wird durch eine feste Agentenkette geführt:
 
-## 🎯 Projektziel
-
-Diese Suite definiert und orchestriert einen hochgradig automatisierten, multi-Agenten-Workflow zur Entwicklung von Softwarelösungen (Code Generation Pipeline). Sie dient dazu, vage Anforderungen von einer initialen Idee bis zu einem getesteten, dokumentierten Artefakt zu führen.
-
-## 📖 Kernprinzipien
-
-1. **Sequenzielle Magie:** Der Prozess ist stark sequenziell und erfordert eine klare Übergabe von *Output* eines Agenten an den *Input* des nächsten.
-2. **Verantwortlichkeit:** Jeder Agent hat eine einzige, klar definierte Rolle (Arcanist, Chronist etc.) und darf nur seine spezifischen Werkzeuge nutzen.
-3. **Persistenz:** Die gesamte Workflow-Definition ist in der `01_WORKFLOW_DEFINITION.md` festgeschrieben, um die Wiederherstellbarkeit zu gewährleisten.
-
-## 🗂️ Repository Struktur
-
-```
-clawdia-agent-suite/
-├── 01_WORKFLOW_DEFINITION.md    # Agenten-Kette & Prozessablauf
-├── 02_SPECS/                    # System-Prompts (Agenten-"Seelen")
-│   ├── chronist_prompt.md       # 📝 Daten-Sammler
-│   ├── arcanist_prompt.md       # 🧠 Architekt & Spezifier
-│   ├── artifac_prompt.md        # 🔨 Code-Baumeister
-│   └── seer_prompt.md           # 👁️ Qualitätswächter
-├── 03_CONFIG/                   # Labels & Prozess-Leitfaden
-│   ├── agent_labels.json        # Agenten-Rollen & Beschreibungen
-│   └── process_guide.md         # Orchestrierungs-Anleitung
-└── README.md
-```
-
-## 🤖 Die Agenten-Kette
-
-```
+```text
 [Input/Ticket]
     ↓
-📝 CHRONIST  → Rohdaten sammeln & dokumentieren
+📝 Chronist  → Rohdaten sammeln & dokumentieren
     ↓
-🧠 ARCANIST  → Spezifikationen erstellen
+🧠 Arcanist  → technische Spezifikation erstellen
     ↓
-🔨 ARTIFAC   → Code generieren & testen
+🔨 Artifac   → Code im Projektordner bauen & testen
     ↓
-👁️ SEER      → Audit-Report & Validierung
+👁️ Seer      → Audit-Report & Validierung
     ↓
 [Ausgeliefertes Artefakt]
 ```
 
-## 🚀 Schneller Start
+## Wichtigste Runtime-Regel
 
-### 1. Repository Klonen
+Agenten arbeiten **nicht** in ihren eigenen Agenten-Ordnern. Jeder Auftrag bekommt einen eigenen Run-Ordner unter `runs/<run-id>/`.
 
-```bash
-gh repo clone michaelallabauer-svg/clawdia-agent-suite
-cd clawdia-agent-suite
+```text
+runs/<run-id>/
+├── 00_input.md
+├── 01_chronist.md
+├── 02_arcanist_spec.md
+├── 03_artifac_report.md
+├── 04_seer_audit.md
+├── state.json
+└── project/          # hier entsteht der eigentliche Projektcode
 ```
 
-### 2. Workflow starten
+Der Orchestrator übergibt jedem Agenten absolute Pfade:
 
-Der Prozess startet immer mit einem Initial-Trigger (z.B. einem neuen Ticket) und wird durch einen zentralen Orchestrator gesteuert.
+- `RUN_DIR` für Übergabe-/Status-Artefakte
+- `PROJECT_DIR` für Code und Projektdateien
 
-Siehe `01_WORKFLOW_DEFINITION.md` für den exakten Ablauf.
+Siehe [`04_RUNTIME/project_contract.md`](./04_RUNTIME/project_contract.md).
 
-### 3. Agenten aktivieren
+## Repository-Struktur
 
-Jeder Agent benötigt einen LLM-Provider. Hier die empfohlenen Modelle:
-
-| Agent | Empfohlenes Modell |
-|-------|-------------------|
-| Chronist | `gemma4` |
-| Arcanist | `gemma4` |
-| Artifac | `qwen2.5-coder:14b` oder `gemma4` |
-| Seer | `gemma4` |
-
-### 4. Manuelles Orchestrieren (Demo-Zwecke)
-
-```bash
-# Beispiel: Manueller Ablauf
-echo "Ich möchte eine To-Do App mit Benutzer-Autentifizierung" \
-  | ollama run gemma4 > chronist_output.md
-
-# Dann Arcanist, Artifac, Seer ...
+```text
+clawdia-agent-suite/
+├── 01_WORKFLOW_DEFINITION.md
+├── 02_SPECS/
+│   ├── chronist_prompt.md
+│   ├── arcanist_prompt.md
+│   ├── artifac_prompt.md
+│   └── seer_prompt.md
+├── 03_CONFIG/
+│   ├── agent_labels.json
+│   └── process_guide.md
+├── 04_RUNTIME/
+│   ├── orchestrator.md
+│   ├── project_contract.md
+│   └── run_state.schema.json
+├── scripts/
+│   └── cas-runner.mjs
+└── runs/
+    └── .gitkeep
 ```
 
-Für automatisierte Orchestrierung siehe `03_CONFIG/process_guide.md`.
+## Schnellstart lokal
 
-## ⚙️ Workflow Definition
+```bash
+node scripts/cas-runner.mjs \
+  --title todo-auth-app \
+  --input "Baue eine kleine To-Do App mit Login und REST API" \
+  --max-iterations 2
+```
 
-Der Workflow folgt einer strengen sequentiellen Kette:
+Der Runner erzeugt einen Run-Ordner, ruft die Agenten sequenziell über `openclaw agent` auf und bricht erst ab, wenn der Seer `CAS_STATUS: PASS` meldet oder die maximale Iterationszahl erreicht ist.
 
-1. **Trigger** → Input (Ticket/Anfrage)
-2. **Chronist** → Sammelt & dokumentiert
-3. **Arcanist** → Erstellt Spezifikationen
-4. **Artifac** → Generiert Code
-5. **Seer** → Validiert & Audit
+## Agenten und empfohlene Modelle
 
-**Kritische Regel:** Der Output eines Agenten MUSS den perfekten Input für den nächsten Agenten sein. Bei Fehlersuche springt der Workflow zurück zum Artifakteur.
+| Agent | Rolle | Modell |
+|---|---|---|
+| Chronist | Rohdaten sammeln | `ollama/qwen3.5:9b` |
+| Arcanist | Spezifikation | `ollama/qwen3.5:9b` |
+| Artifac | Code bauen | `ollama/qwen2.5-coder:14b` |
+| Seer | Audit | `ollama/qwen3.5:9b` |
 
-## 📋 Agenten-Rollen im Detail
+## PASS/FAIL Loop
 
-### 📝 Chronist (Data Collector)
-- Sammelt Rohinformationen von der Quelle
-- Dokumentiert unstrukturierte Anforderungen
-- Stellt klare Fragen bei unvollständigen Daten
+Der Seer muss exakt eine Statuszeile ausgeben:
 
-### 🧠 Arcanist (Architect)
-- Verwandelt Rohdaten in präzise Spezifikationen
-- Definiert Scope, Abhängigkeiten, Datenmodelle
-- Dokumentiert Annahmen & Risiken
+```text
+CAS_STATUS: PASS
+```
 
-### 🔨 Artifakteur (Builder)
-- Generiert funktionsfähigen Code
-- Implementiert Tests für jeden Block
-- Fragt bei externen Abhängigkeiten nach Freigabe
+oder
 
-### 👁️ Seer (Auditor)
-- Generiert Testfälle & Edge-Cases
-- Erstellt Audit-Report (PASS/FAIL)
-- Stellt Korrekturanweisungen
+```text
+CAS_STATUS: FAIL
+```
 
-## ⚠️ Kritische Regeln (Red Lines)
+Bei `FAIL` startet der Orchestrator Artifac erneut mit dem Audit als Fix-Kontext.
 
-- **Sicherheit:** Alle Tools müssen durch manuelle Bestätigung freigegeben werden (insbesondere Installationen).
-- **Skalierbarkeit:** Der gesamte Workflow wird durch einen `taskflow/cron Job` gesteuert, der auf Telegram-Trigger lauscht.
-- **Output-Handling:** Der Output jedes Agenten MUSS den perfekten Input für den nächsten Agenten sein.
-- **Fehlgeschlagener Schritt:** Wenn der Seer einen Fehler meldet, muss der Workflow *zurückspringen* und den Artifakteur anweisen, diesen Fehler zu beheben.
+## Red Lines
 
-## 🔧 Konfiguration
-
-Alle Agenten-Konfigurationen befinden sich in `03_CONFIG/`:
-
-- `agent_labels.json` → Agenten-Rollen und Beschreibungen
-- `process_guide.md` → Orchestrierungs-Anleitung
-
-Siehe `03_CONFIG/process_guide.md` für detaillierte Konfigurationsoptionen.
-
-## 📚 Dokumentationen
-
-- [Workflow Definition](./01_WORKFLOW_DEFINITION.md) → Exakter Prozessablauf
-- [Agenten-Prompts](./02_SPECS/) → System-Prompts für jeden Agenten
-- [Agenten-Labels](./03_CONFIG/agent_labels.json) → Rollen-Definitionen
-- [Prozess-Leitfaden](./03_CONFIG/process_guide.md) → Orchestrierungs-Anleitung
-
-## 🤝 Community
-
-Haben Sie Fragen oder möchten Sie Verbesserungen vorschlagen? Öffnen Sie ein Issue!
-
-## 📄 License
-
-Diese Projekt steht unter der Apache License, Version 2.0. Siehe [LICENSE](LICENSE) für Details.
-
-## 👤 Author
-
-Erstellt von **Clawdia** – dem Agenten, der hilft, nicht nur posiert. 🐾
-
----
-
-*_Dieses Repository dient als Grundlage für die fortlaufende Entwicklung der Clawdia-Agent-Suite._*
+- Keine projektbezogenen Dateien in Agent-Workspaces.
+- Keine externen Installationen oder Public Writes ohne Freigabe.
+- Keine Secrets im Code.
+- Seer-Failures werden nicht ignoriert.

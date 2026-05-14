@@ -1,18 +1,48 @@
-# ⚙️ Workflow Orchestrierung: Die Kette der Schöpfung
+# Workflow-Orchestrierung: Die Kette der Schöpfung
+
 ## Ziel
-Dieses Dokument definiert die exakte, sequentielle Abfolge der Agenten, die notwendig ist, um eine vollständige Software-Lösung zu entwickeln.
 
-## 🔗 Der Prozessablauf (TaskFlow)
-1.  **[Trigger]** Ein externer Input (Ticket/Anfrage) wird empfangen.
-2.  **Agent 1: Chronist** $\rightarrow$ Nimmt den Input auf.
-3.  **Agent 2: Arcanist** $\rightarrow$ Nimmt den Output des Chronisten.
-4.  **Agent 3: Artifac** $\rightarrow$ Nimmt die Spezifikation des Arkanisten.
-5.  **Agent 4: Seer** $\rightarrow$ Nimmt den Code des Artifakteurs und validiert diesen.
-6.  **[Ende]** Das finale Ergebnis (Pass-Report) wird an den Nutzer zurückgemeldet.
+Dieses Dokument definiert die ausführbare, sequentielle Abfolge der Clawdia Agent Suite. Der Workflow nimmt einen externen Input entgegen und erzeugt ein getestetes Projektartefakt in einem gemeinsamen Projektordner.
 
-## ⚠️ Kritische Abhängigkeiten & Regeln
-*   **Output-Handling:** Der Output jedes Agenten MUSS den perfekten Input für den nächsten Agenten sein.
-*   **Fehlgeschlagener Schritt:** Wenn der Seer einen Fehler meldet, muss der Workflow *zurückspringen* und den Artifakteur anweisen, diesen Fehler zu beheben (Dies erfordert eine "Loop"-Funktionalität, die im Orchestrator implementiert werden muss).
+## Runtime-Verzeichnisse
 
----
-*Hier wird das Skript für das TaskFlow/CronJob hinterlegt.*
+Jeder Auftrag erhält einen eigenen Run-Ordner:
+
+```text
+runs/<run-id>/
+├── 00_input.md
+├── 01_chronist.md
+├── 02_arcanist_spec.md
+├── 03_artifac_report.md
+├── 04_seer_audit.md
+├── state.json
+└── project/
+```
+
+**Pflicht:** Alle Agenten müssen in diesen Ordnern arbeiten. `project/` ist der einzige Ort für Projektcode.
+
+## Prozessablauf
+
+1. **Trigger**: Input/Ticket wird als `00_input.md` gespeichert.
+2. **Chronist**: liest `00_input.md`, schreibt `01_chronist.md`.
+3. **Arcanist**: liest `01_chronist.md`, schreibt `02_arcanist_spec.md`.
+4. **Artifac**: liest `02_arcanist_spec.md`, baut Code in `project/`, schreibt `03_artifac_report.md`.
+5. **Seer**: liest Spec + Code, schreibt `04_seer_audit.md` mit `CAS_STATUS`.
+6. **Loop**: Bei `CAS_STATUS: FAIL` geht der Workflow zurück zu Artifac.
+7. **Ende**: Bei `CAS_STATUS: PASS` ist der Auftrag abgeschlossen.
+
+## Kritische Regeln
+
+- Output jedes Agenten muss perfekter Input für den nächsten sein.
+- Keine Agenten-eigenen Workspaces für Projektdaten.
+- Alle Pfade werden absolut übergeben: `RUN_DIR`, `PROJECT_DIR`.
+- Der Seer entscheidet formal über PASS/FAIL.
+- Der Orchestrator hält `state.json` aktuell.
+
+## Startpunkt
+
+Referenzimplementierung:
+
+```bash
+node scripts/cas-runner.mjs --input "<auftrag>" --title "<slug>"
+```

@@ -69,5 +69,13 @@
   - **Mitigation:** [Maßnahme]
 ```
 
+## Gemeinsamer Arbeitsvertrag
+
+- Arbeite ausschließlich im vom Orchestrator genannten `RUN_DIR`.
+- Projektcode und technische Artefakte gehören ausschließlich in `PROJECT_DIR`.
+- Schreibe keine Dateien in deinen eigenen Agenten-Workspace.
+- Verwende absolute Pfade aus dem Orchestrator-Prompt.
+- Dein Output muss in die vom Orchestrator genannte Datei geschrieben werden.
+
 ---
 *Der Arcanist verwandelt Chaos in Klarheit. Ohne präzise Spezifikation kann der Artifac nicht bauen.*
