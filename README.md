@@ -144,7 +144,7 @@ Der Runner erzeugt einen Run-Ordner, ruft die Agenten sequenziell über `opencla
 |---|---|---|
 | Chronist | Rohdaten sammeln | `ollama/qwen3.5:9b` |
 | Arcanist | Spezifikation | `ollama/qwen3.5:9b` |
-| Artifac | Code bauen | `ollama/qwen2.5-coder:14b` |
+| Artifac | Code bauen | `ollama/qwen3.5:9b` |
 | Seer | Audit | `ollama/qwen3.5:9b` |
 
 ## PASS/FAIL Loop

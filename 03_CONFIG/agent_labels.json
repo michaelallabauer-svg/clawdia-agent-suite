@@ -16,7 +16,7 @@
   "artifac": {
     "role_desc": "Der Baumeister. Er weiß, wie man aus einem Bauplan ein funktionierendes Artefakt (Code) erschafft.",
     "prompt_focus": "Code-Generierung, Tool-Nutzung, Bestehensweise von Code-Blöcken.",
-    "model": "ollama/qwen2.5-coder:14b",
+    "model": "ollama/qwen3.5:9b",
     "input": "RUN_DIR/02_arcanist_spec.md",
     "output": "PROJECT_DIR/* plus RUN_DIR/03_artifac_report.md"
   },
