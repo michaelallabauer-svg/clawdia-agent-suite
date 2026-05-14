@@ -1,3 +1,5 @@
 # Runtime outputs
 runs/*
 !runs/.gitkeep
+logs/*
+!logs/.gitkeep
